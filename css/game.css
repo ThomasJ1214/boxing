@@ -1,0 +1,349 @@
+/* ============================================
+   Virtual Boxing - Game Page Styles
+   ============================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #0a0a0f;
+  color: #e0e0e0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Overlays */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: opacity 0.3s;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-content {
+  text-align: center;
+}
+
+.overlay-content h1 {
+  font-size: 3rem;
+  letter-spacing: 6px;
+  color: #fff;
+}
+
+.overlay-content p {
+  color: #888;
+  margin-top: 12px;
+  font-size: 1rem;
+}
+
+.loader {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(33, 150, 243, 0.2);
+  border-top-color: #2196F3;
+  border-radius: 50%;
+  margin: 20px auto;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.countdown-number {
+  font-size: 10rem;
+  font-weight: 900;
+  color: #2196F3;
+  text-shadow: 0 0 60px rgba(33, 150, 243, 0.6);
+  animation: countPulse 0.5s ease-out;
+}
+
+@keyframes countPulse {
+  0% { transform: scale(1.5); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.round-announce {
+  font-size: 4rem;
+  color: #FF9800;
+  text-shadow: 0 0 40px rgba(255, 152, 0, 0.5);
+}
+
+/* End screen */
+.end-screen {
+  min-width: 400px;
+}
+
+.end-screen h1 {
+  font-size: 3.5rem;
+  margin-bottom: 24px;
+}
+
+.end-stats {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  text-align: left;
+  font-size: 0.95rem;
+  line-height: 2;
+}
+
+.end-stats .stat-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.end-stats .stat-label {
+  color: #888;
+}
+
+.end-stats .stat-value {
+  color: #fff;
+  font-weight: 600;
+}
+
+.end-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.end-btn {
+  padding: 14px 36px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: linear-gradient(135deg, #1565C0, #2196F3);
+  color: white;
+}
+
+.end-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #aaa;
+}
+
+.end-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(33, 150, 243, 0.4);
+}
+
+.end-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+}
+
+/* Main game layout - split screen */
+.game-container {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  height: 100vh;
+  gap: 2px;
+  background: #111;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: #0a0a0f;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.75rem;
+  letter-spacing: 3px;
+  color: #555;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Webcam panel */
+.canvas-wrapper {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+#webcam {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+#webcam-canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.tracking-info {
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.7rem;
+  color: #555;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Game panel */
+.hud-bars {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.fighter-hud {
+  flex: 1;
+}
+
+.fighter-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.fighter-name.blue { color: #2196F3; }
+.fighter-name.red { color: #F44336; }
+
+.bar-container {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  height: 14px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.bar-container.stamina {
+  height: 6px;
+  margin-top: 2px;
+}
+
+.health-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #1565C0, #2196F3);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.health-bar.ai {
+  background: linear-gradient(90deg, #C62828, #F44336);
+}
+
+.stamina-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #F9A825, #FDD835);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.stamina-bar.ai {
+  background: linear-gradient(90deg, #F9A825, #FDD835);
+}
+
+.vs-badge {
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: #444;
+  letter-spacing: 2px;
+}
+
+.ai-hud {
+  text-align: right;
+}
+
+.ai-hud .health-bar,
+.ai-hud .stamina-bar {
+  float: right;
+}
+
+.game-canvas-wrapper {
+  flex: 1;
+  background: #0d1117;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Action display */
+.action-display {
+  position: absolute;
+  bottom: 80px;
+  right: 30px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #FF9800;
+  text-shadow: 0 0 20px rgba(255, 152, 0, 0.6);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.action-display.visible {
+  opacity: 1;
+  animation: actionPop 0.4s ease-out;
+}
+
+@keyframes actionPop {
+  0% { transform: scale(1.5) translateY(10px); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* Screen shake */
+.screen-shake {
+  animation: shake 0.15s ease-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-4px, 2px); }
+  50% { transform: translate(4px, -2px); }
+  75% { transform: translate(-2px, 4px); }
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+  .game-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: 0.4fr 0.6fr;
+  }
+}

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Boxing - Fight!</title>
+  <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+  <!-- Loading overlay -->
+  <div id="loading-overlay" class="overlay">
+    <div class="overlay-content">
+      <h1>LOADING</h1>
+      <p id="loading-status">Initializing hand tracking...</p>
+      <div class="loader"></div>
+    </div>
+  </div>
+
+  <!-- Countdown overlay -->
+  <div id="countdown-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h1 id="countdown-text" class="countdown-number">3</h1>
+    </div>
+  </div>
+
+  <!-- Round announcement overlay -->
+  <div id="round-overlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h1 id="round-text" class="round-announce">ROUND 1</h1>
+    </div>
+  </div>
+
+  <!-- Match end overlay -->
+  <div id="end-overlay" class="overlay hidden">
+    <div class="overlay-content end-screen">
+      <h1 id="end-title"></h1>
+      <div id="end-stats" class="end-stats"></div>
+      <div class="end-buttons">
+        <button class="end-btn" id="rematch-btn">REMATCH</button>
+        <button class="end-btn secondary" id="menu-btn">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main game layout -->
+  <div class="game-container">
+    <!-- Left panel: Webcam + Skeleton -->
+    <div class="panel webcam-panel">
+      <div class="panel-header">HAND TRACKING</div>
+      <div class="canvas-wrapper">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="webcam-canvas"></canvas>
+      </div>
+      <div class="tracking-info">
+        <span id="fps-display">FPS: --</span>
+        <span id="hands-display">Hands: 0</span>
+      </div>
+    </div>
+
+    <!-- Right panel: Boxing match -->
+    <div class="panel game-panel">
+      <div class="panel-header">
+        <span id="difficulty-display">EASY</span>
+        <span id="round-display">ROUND 1 / 3</span>
+        <span id="timer-display">3:00</span>
+      </div>
+
+      <!-- Health / Stamina bars -->
+      <div class="hud-bars">
+        <div class="fighter-hud player-hud">
+          <span class="fighter-name blue">YOU</span>
+          <div class="bar-container">
+            <div class="health-bar" id="player-health-bar"></div>
+          </div>
+          <div class="bar-container stamina">
+            <div class="stamina-bar" id="player-stamina-bar"></div>
+          </div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="fighter-hud ai-hud">
+          <span class="fighter-name red">CPU</span>
+          <div class="bar-container">
+            <div class="health-bar ai" id="ai-health-bar"></div>
+          </div>
+          <div class="bar-container stamina">
+            <div class="stamina-bar ai" id="ai-stamina-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game canvas -->
+      <div class="canvas-wrapper game-canvas-wrapper">
+        <canvas id="game-canvas"></canvas>
+      </div>
+
+      <!-- Combo / action display -->
+      <div id="action-display" class="action-display"></div>
+    </div>
+  </div>
+
+  <!-- MediaPipe CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+
+  <!-- Game modules -->
+  <script src="js/audio.js"></script>
+  <script src="js/handTracking.js"></script>
+  <script src="js/punchDetection.js"></script>
+  <script src="js/fighter.js"></script>
+  <script src="js/physics.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/aiOpponent.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

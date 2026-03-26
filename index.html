@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Boxing - Hand Tracking Fighter</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+
+  <div class="container">
+    <header class="hero">
+      <h1 class="title">VIRTUAL<br><span class="title-accent">BOXING</span></h1>
+      <p class="subtitle">Fight with your fists. Track your hands. Knock out the AI.</p>
+    </header>
+
+    <section class="how-to-play">
+      <h2>HOW TO PLAY</h2>
+      <div class="instructions-grid">
+        <div class="instruction-card">
+          <div class="instruction-icon">👊</div>
+          <h3>JAB</h3>
+          <p>Quick straight punch with your front hand</p>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-icon">💥</div>
+          <h3>CROSS</h3>
+          <p>Powerful straight punch with your rear hand</p>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-icon">🪝</div>
+          <h3>HOOK</h3>
+          <p>Swing your fist in an arc from the side</p>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-icon">⬆️</div>
+          <h3>UPPERCUT</h3>
+          <p>Drive your fist upward from below</p>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-icon">🛡️</div>
+          <h3>BLOCK</h3>
+          <p>Raise both hands near your face to guard</p>
+        </div>
+        <div class="instruction-card">
+          <div class="instruction-icon">↔️</div>
+          <h3>DODGE</h3>
+          <p>Lean left or right to avoid incoming punches</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="difficulty-section">
+      <h2>SELECT DIFFICULTY</h2>
+      <div class="difficulty-grid">
+        <button class="difficulty-btn selected" data-difficulty="easy">
+          <span class="diff-label">EASY</span>
+          <span class="diff-desc">Slow opponent, great for learning</span>
+        </button>
+        <button class="difficulty-btn" data-difficulty="medium">
+          <span class="diff-label">MEDIUM</span>
+          <span class="diff-desc">Moderate speed, occasional combos</span>
+        </button>
+        <button class="difficulty-btn" data-difficulty="hard">
+          <span class="diff-label">HARD</span>
+          <span class="diff-desc">Fast reactions, counter-attacks</span>
+        </button>
+        <button class="difficulty-btn" data-difficulty="insane">
+          <span class="diff-label">INSANE</span>
+          <span class="diff-desc">Adaptive AI, relentless attacks</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="start-section">
+      <button class="start-btn" id="start-btn">
+        <span class="start-text">START FIGHT</span>
+        <span class="start-icon">🥊</span>
+      </button>
+      <p class="camera-note">Requires webcam access for hand tracking</p>
+    </section>
+
+    <footer class="footer">
+      <p>Virtual Boxing &mdash; Browser-based hand tracking boxing game</p>
+    </footer>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
