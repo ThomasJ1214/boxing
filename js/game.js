@@ -19,8 +19,10 @@ const Game = (function () {
   let player = null;
   let ai = null;
 
-  // Track hand data from hand tracking callback
+  // Double-buffered hand data - tracking writes to pending, game loop swaps to active
+  let pendingHandsData = [];
   let currentHandsData = [];
+  let handDataFresh = false;
   let currentFps = 0;
 
   function getDifficulty() {
@@ -77,7 +79,8 @@ const Game = (function () {
   }
 
   function onHandTrackingResults(hands, fps) {
-    currentHandsData = hands;
+    pendingHandsData = hands;
+    handDataFresh = true;
     currentFps = fps;
     UI.updateTracking(fps, hands.length);
   }
@@ -127,6 +130,12 @@ const Game = (function () {
       return;
     }
 
+    // --- Swap hand tracking buffer (prevents mid-frame mutations) ---
+    if (handDataFresh) {
+      currentHandsData = pendingHandsData;
+      handDataFresh = false;
+    }
+
     // --- Process hand tracking input ---
     const detection = PunchDetection.update(currentHandsData);
 
@@ -149,16 +158,20 @@ const Game = (function () {
       }
     }
 
-    // Map hand positions to player arm rendering
+    // Map hand positions to player arm rendering (lerp toward target, not max)
     if (detection.handPositions.Left) {
       const lp = detection.handPositions.Left;
-      player.leftArmExtension = Math.max(player.leftArmExtension,
-        (0.5 - lp.y) * 1.5); // higher hand = more extension visual
+      const targetExt = Math.max(0, (0.5 - lp.y) * 1.5);
+      player.leftArmExtension += (targetExt - player.leftArmExtension) * 0.3;
+    } else {
+      player.leftArmExtension *= 0.85; // decay when hand not tracked
     }
     if (detection.handPositions.Right) {
       const rp = detection.handPositions.Right;
-      player.rightArmExtension = Math.max(player.rightArmExtension,
-        (0.5 - rp.y) * 1.5);
+      const targetExt = Math.max(0, (0.5 - rp.y) * 1.5);
+      player.rightArmExtension += (targetExt - player.rightArmExtension) * 0.3;
+    } else {
+      player.rightArmExtension *= 0.85; // decay when hand not tracked
     }
 
     // --- Update AI ---
