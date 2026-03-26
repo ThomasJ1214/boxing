@@ -10,7 +10,7 @@ const PunchDetection = (function () {
   // Position history per hand - larger buffer for multi-window analysis
   const history = { Left: [], Right: [] };
   const HISTORY_SIZE = 16;
-  const COOLDOWN_MS = 180; // reduced from 250 for faster combos
+  const COOLDOWN_MS = 400; // minimum time between punches per hand
   const lastPunchTime = { Left: 0, Right: 0 };
 
   // Track when we last saw each hand to handle dropouts
@@ -21,15 +21,18 @@ const PunchDetection = (function () {
   const velocityHistory = { Left: [], Right: [] };
   const VELOCITY_HISTORY_SIZE = 6;
 
-  // Thresholds (tuned lower since adaptive smoothing preserves more signal now)
-  const VELOCITY_THRESHOLD = 0.025;
-  const HOOK_LATERAL_THRESHOLD = 0.018;
-  const UPPERCUT_VERTICAL_THRESHOLD = -0.022;
+  // Thresholds - require deliberate motion, not slight fidgeting
+  const VELOCITY_THRESHOLD = 0.07;
+  const HOOK_LATERAL_THRESHOLD = 0.035;
+  const UPPERCUT_VERTICAL_THRESHOLD = -0.04;
+
+  // Minimum displacement (distance hand must travel) to count as a punch
+  const MIN_PUNCH_DISPLACEMENT = 0.04;
 
   // State tracking for in-flight punches
   const punchState = {
-    Left: { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0 },
-    Right: { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0 },
+    Left: { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0, startPos: null },
+    Right: { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0, startPos: null },
   };
   const PUNCH_FLIGHT_MAX_MS = 350; // max time a punch can be "in flight" before we emit it
 
@@ -193,7 +196,7 @@ const PunchDetection = (function () {
       }
     }
 
-    if (!bestType || bestScore < 0.3) return null;
+    if (!bestType || bestScore < 0.5) return null;
 
     return { type: bestType, score: bestScore };
   }
@@ -256,11 +259,13 @@ const PunchDetection = (function () {
         const state = punchState[label];
 
         if (!state.inFlight) {
-          // Start tracking this punch - wait for peak velocity
+          // Start tracking this punch - record start position for displacement check
           state.inFlight = true;
           state.peakVelocity = classification.score;
           state.peakType = classification.type;
           state.startTime = now;
+          const entry = history[label][history[label].length - 1];
+          state.startPos = { x: entry.x, y: entry.y };
         } else {
           // Update if we found a higher peak
           if (classification.score > state.peakVelocity) {
@@ -279,25 +284,35 @@ const PunchDetection = (function () {
 
         // Emit punch when velocity starts dropping (deceleration phase) or timeout
         if (velocityDropping || timedOut) {
-          const fist = !hand.predicted && isFist(hand.landmarks);
-          let power = Math.min(1, state.peakVelocity / 1.5);
-          if (fist) power = Math.min(1, power * 1.3);
-          power = Math.max(0.3, power);
+          // Check displacement - hand must have traveled a real distance
+          const entry = history[label][history[label].length - 1];
+          const displacement = state.startPos
+            ? Math.hypot(entry.x - state.startPos.x, entry.y - state.startPos.y)
+            : 0;
 
-          results.punches.push({
-            type: state.peakType,
-            hand: label,
-            power: power,
-            position: knuckle,
-          });
+          if (displacement >= MIN_PUNCH_DISPLACEMENT) {
+            const fist = !hand.predicted && isFist(hand.landmarks);
+            let power = Math.min(1, state.peakVelocity / 1.5);
+            if (fist) power = Math.min(1, power * 1.3);
+            power = Math.max(0.3, power);
 
-          lastPunchTime[label] = now;
-          // Trim history but keep last 3 entries for continuity (don't wipe)
+            results.punches.push({
+              type: state.peakType,
+              hand: label,
+              power: power,
+              position: knuckle,
+            });
+
+            lastPunchTime[label] = now;
+          }
+
+          // Always reset tracking state
           history[label] = history[label].slice(-3);
           velocityHistory[label] = [];
           state.inFlight = false;
           state.peakVelocity = 0;
           state.peakType = null;
+          state.startPos = null;
         }
       }
     }
@@ -309,30 +324,39 @@ const PunchDetection = (function () {
       const state = punchState[label];
 
       if (state.inFlight && elapsed < HAND_MEMORY_MS) {
-        // Hand dropped mid-punch - emit what we have (the punch is still valid)
-        let power = Math.min(1, state.peakVelocity / 1.5);
-        power = Math.max(0.3, power);
-
+        // Hand dropped mid-punch - check displacement before emitting
         const lastEntry = history[label] && history[label].length > 0
           ? history[label][history[label].length - 1]
           : { x: 0.5, y: 0.5, z: 0 };
 
-        results.punches.push({
-          type: state.peakType,
-          hand: label,
-          power: power,
-          position: lastEntry,
-        });
+        const displacement = state.startPos
+          ? Math.hypot(lastEntry.x - state.startPos.x, lastEntry.y - state.startPos.y)
+          : 0;
 
-        lastPunchTime[label] = now;
+        if (displacement >= MIN_PUNCH_DISPLACEMENT) {
+          let power = Math.min(1, state.peakVelocity / 1.5);
+          power = Math.max(0.3, power);
+
+          results.punches.push({
+            type: state.peakType,
+            hand: label,
+            power: power,
+            position: lastEntry,
+          });
+
+          lastPunchTime[label] = now;
+        }
+
         state.inFlight = false;
         state.peakVelocity = 0;
         state.peakType = null;
+        state.startPos = null;
       } else if (state.inFlight && elapsed >= HAND_MEMORY_MS) {
         // Hand gone too long - discard
         state.inFlight = false;
         state.peakVelocity = 0;
         state.peakType = null;
+        state.startPos = null;
       }
     }
 
@@ -348,8 +372,8 @@ const PunchDetection = (function () {
     lastPunchTime.Right = 0;
     lastHandSeen.Left = 0;
     lastHandSeen.Right = 0;
-    punchState.Left = { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0 };
-    punchState.Right = { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0 };
+    punchState.Left = { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0, startPos: null };
+    punchState.Right = { inFlight: false, peakVelocity: 0, peakType: null, startTime: 0, startPos: null };
   }
 
   return { update, reset };
