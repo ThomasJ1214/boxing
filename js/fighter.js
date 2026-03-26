@@ -1,5 +1,6 @@
 // ============================================
 // Fighter Class - Player and AI
+// With guard break, block stamina drain
 // ============================================
 
 const Fighter = (function () {
@@ -29,19 +30,19 @@ const Fighter = (function () {
   class FighterInstance {
     constructor(isPlayer, side) {
       this.isPlayer = isPlayer;
-      this.side = side; // 'left' or 'right' (screen position)
+      this.side = side;
       this.health = 100;
       this.maxHealth = 100;
       this.stamina = 100;
       this.maxStamina = 100;
-      this.staminaRegen = 8; // per second
+      this.staminaRegen = 8;
 
-      this.state = 'idle'; // idle, punching, blocking, stunned, knockdown, ko
+      this.state = 'idle';
       this.punchType = null;
       this.punchHand = null;
       this.punchPower = 0;
       this.punchStartTime = 0;
-      this.punchProgress = 0; // 0 to 1
+      this.punchProgress = 0;
       this.punchConnected = false;
 
       this.blockActive = false;
@@ -52,41 +53,57 @@ const Fighter = (function () {
       this.hitFlashTime = 0;
       this.invulnerableUntil = 0;
 
+      // Guard break system
+      this.guardIntegrity = 100;
+      this.maxGuardIntegrity = 100;
+      this.guardIntegrityRegen = 15; // per second when not blocking
+      this.guardBroken = false;
+      this.guardBreakCost = 25; // per blocked hit
+
+      // Block stamina drain
+      this.blockStaminaDrain = 3; // per second
+
       // Combo tracking
       this.comboCount = 0;
       this.lastHitTime = 0;
-      this.comboTimeout = 1500; // ms to maintain combo
+      this.comboTimeout = 1500;
 
       // Stats
       this.stats = {
         punchesThrown: 0,
         punchesLanded: 0,
+        punchesBlocked: 0,
         damageDealt: 0,
         damageReceived: 0,
         knockdowns: 0,
         comboBest: 0,
       };
 
-      // Position for rendering (normalized 0-1)
+      // Position for rendering
       this.bodyX = side === 'left' ? 0.3 : 0.7;
       this.bodyY = 0.5;
 
-      // Arm positions (for rendering)
-      this.leftArmExtension = 0;  // 0 = guard, 1 = fully extended
+      // Arm positions
+      this.leftArmExtension = 0;
       this.rightArmExtension = 0;
       this.leftArmAngle = 0;
       this.rightArmAngle = 0;
-      this.guardHeight = 0; // 0 = normal, 1 = high guard
+      this.guardHeight = 0;
 
       // Sway animation
       this.swayOffset = 0;
       this.swaySpeed = isPlayer ? 0 : 1.5;
-      this.dodgeOffset = 0; // -1 left, 0 center, 1 right
+      this.dodgeOffset = 0;
     }
 
     throwPunch(type, hand, power) {
-      if (this.state !== 'idle' && this.state !== 'blocking') return false;
+      if (this.state === 'stunned' || this.state === 'knockdown' || this.state === 'ko') return false;
+      if (this.state === 'punching') return false;
       if (this.stamina < PUNCH_STAMINA_COST[type]) return false;
+
+      // Force exit blocking when punching
+      this.blockActive = false;
+      this.guardHeight = 0;
 
       this.state = 'punching';
       this.punchType = type;
@@ -102,11 +119,14 @@ const Fighter = (function () {
 
     setBlocking(active) {
       if (this.state === 'stunned' || this.state === 'knockdown' || this.state === 'ko') return;
-      if (active && this.state !== 'punching') {
+      if (this.state === 'punching') return;
+      if (this.guardBroken) return;
+
+      if (active) {
         this.state = 'blocking';
         this.blockActive = true;
         this.guardHeight = 1;
-      } else if (!active && this.state === 'blocking') {
+      } else if (this.state === 'blocking') {
         this.state = 'idle';
         this.blockActive = false;
         this.guardHeight = 0;
@@ -119,9 +139,16 @@ const Fighter = (function () {
 
       let actualDamage = damage;
 
-      if (this.blockActive) {
+      if (this.blockActive && !this.guardBroken) {
         actualDamage = damage * 0.2;
-        this.stamina -= damage * 0.15; // blocking costs stamina
+        this.stamina -= damage * 0.15;
+        this.stats.punchesBlocked++;
+
+        // Guard integrity loss
+        this.guardIntegrity -= this.guardBreakCost;
+        if (this.guardIntegrity <= 0) {
+          this.triggerGuardBreak(now);
+        }
       }
 
       this.health = Math.max(0, this.health - actualDamage);
@@ -129,7 +156,7 @@ const Fighter = (function () {
       this.hitFlashTime = now;
       this.invulnerableUntil = now + 150;
 
-      // Stun on heavy hits
+      // Stun on heavy hits (not while blocking)
       if (!this.blockActive && actualDamage > 12) {
         this.state = 'stunned';
         this.stunEndTime = now + 400;
@@ -148,9 +175,23 @@ const Fighter = (function () {
       return actualDamage;
     }
 
+    triggerGuardBreak(now) {
+      this.guardBroken = true;
+      this.guardIntegrity = 0;
+      this.blockActive = false;
+      this.guardHeight = 0;
+      this.state = 'stunned';
+      this.stunEndTime = now + 500;
+
+      // Guard break recovers after stun
+      setTimeout(() => {
+        this.guardBroken = false;
+      }, 600);
+    }
+
     triggerKnockdown(now) {
       this.state = 'knockdown';
-      this.knockdownEndTime = now + 3000;
+      this.knockdownEndTime = now + 5000; // longer for 8-count system
       this.knockdowns++;
       this.stats.knockdowns++;
 
@@ -164,7 +205,6 @@ const Fighter = (function () {
       const range = PUNCH_DAMAGE[punchType];
       const baseDamage = range.min + (range.max - range.min) * power;
 
-      // Combo multiplier
       let comboMult = 1;
       if (this.comboCount >= 5) comboMult = 2.0;
       else if (this.comboCount >= 3) comboMult = 1.5;
@@ -190,12 +230,24 @@ const Fighter = (function () {
     update(dt) {
       const now = performance.now();
 
-      // Stamina regeneration
-      if (this.state !== 'punching') {
+      // Stamina regeneration (slower while blocking)
+      if (this.state === 'blocking') {
+        this.stamina = Math.max(0, this.stamina - this.blockStaminaDrain * dt);
+        // Force drop guard if stamina depleted
+        if (this.stamina <= 0) {
+          this.setBlocking(false);
+        }
+      } else if (this.state !== 'punching') {
         this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * dt);
       }
 
-      // Punch animation progress
+      // Guard integrity regeneration (when not blocking)
+      if (!this.blockActive && !this.guardBroken) {
+        this.guardIntegrity = Math.min(this.maxGuardIntegrity,
+          this.guardIntegrity + this.guardIntegrityRegen * dt);
+      }
+
+      // Punch animation progress with eased curve
       if (this.state === 'punching') {
         const elapsed = now - this.punchStartTime;
         const duration = PUNCH_DURATION[this.punchType] || 300;
@@ -213,11 +265,12 @@ const Fighter = (function () {
         this.state = 'idle';
       }
 
-      // Knockdown recovery
+      // Knockdown recovery handled by game.js (standing 8-count)
+      // Only auto-recover if not using 8-count system
       if (this.state === 'knockdown' && now > this.knockdownEndTime) {
         if (this.health > 0) {
           this.state = 'idle';
-          this.health = Math.max(this.health, 15); // get up with some health
+          this.health = Math.max(this.health, 15);
         }
       }
 
@@ -231,7 +284,7 @@ const Fighter = (function () {
         this.swayOffset = Math.sin(now / 1000 * this.swaySpeed) * 0.01;
       }
 
-      // Update arm animations based on state
+      // Update arm positions
       this.updateArmPositions();
     }
 
@@ -239,17 +292,16 @@ const Fighter = (function () {
       const target = { leftExt: 0, rightExt: 0, leftAng: 0, rightAng: 0 };
 
       if (this.state === 'punching') {
-        const ext = this.punchProgress < 0.5
-          ? this.punchProgress * 2  // extending
-          : (1 - this.punchProgress) * 2; // retracting
+        // Eased extension: sine curve for snappy extend/retract
+        const ext = Math.sin(this.punchProgress * Math.PI);
 
         if (this.punchHand === 'Left') {
           target.leftExt = ext;
-          if (this.punchType === 'hook') target.leftAng = -0.5 * ext;
+          if (this.punchType === 'hook') target.leftAng = -0.6 * ext;
           if (this.punchType === 'uppercut') target.leftAng = 0.8 * ext;
         } else {
           target.rightExt = ext;
-          if (this.punchType === 'hook') target.rightAng = 0.5 * ext;
+          if (this.punchType === 'hook') target.rightAng = 0.6 * ext;
           if (this.punchType === 'uppercut') target.rightAng = 0.8 * ext;
         }
       }
@@ -266,7 +318,6 @@ const Fighter = (function () {
       this.leftArmAngle += (target.leftAng - this.leftArmAngle) * lerp;
       this.rightArmAngle += (target.rightAng - this.rightArmAngle) * lerp;
 
-      // Guard height smoothing
       const guardTarget = this.state === 'blocking' ? 1 : 0;
       this.guardHeight += (guardTarget - this.guardHeight) * lerp;
     }
@@ -274,6 +325,8 @@ const Fighter = (function () {
     resetForRound() {
       this.health = this.maxHealth;
       this.stamina = this.maxStamina;
+      this.guardIntegrity = this.maxGuardIntegrity;
+      this.guardBroken = false;
       this.state = 'idle';
       this.punchType = null;
       this.punchProgress = 0;
@@ -287,6 +340,7 @@ const Fighter = (function () {
       this.stats = {
         punchesThrown: 0,
         punchesLanded: 0,
+        punchesBlocked: 0,
         damageDealt: 0,
         damageReceived: 0,
         knockdowns: 0,

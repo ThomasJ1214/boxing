@@ -1,5 +1,6 @@
 // ============================================
 // AI Opponent - Behavior per difficulty level
+// Fixed: setTimeout dodge, counter window
 // ============================================
 
 const AIOpponent = (function () {
@@ -7,15 +8,15 @@ const AIOpponent = (function () {
 
   const DIFFICULTY_CONFIG = {
     easy: {
-      attackInterval: [2000, 3000],     // ms between attacks
-      blockChance: 0.10,                // chance to block incoming
-      comboChance: 0.0,                 // chance for multi-hit combo
+      attackInterval: [2000, 3000],
+      blockChance: 0.10,
+      comboChance: 0.0,
       maxCombo: 1,
-      counterChance: 0.0,              // chance to counter after blocking
+      counterChance: 0.0,
       dodgeChance: 0.0,
-      windupTime: 500,                 // telegraph time before punch
-      reactionTime: 800,               // ms to react to player punch
-      punchTypes: ['jab'],             // available punches
+      windupTime: 500,
+      reactionTime: 800,
+      punchTypes: ['jab'],
       aggression: 0.3,
       patternMemory: 0,
     },
@@ -62,14 +63,20 @@ const AIOpponent = (function () {
 
   let config = null;
   let fighter = null;
-  let state = 'idle'; // idle, winding_up, attacking, blocking, recovering
+  let state = 'idle';
   let nextAttackTime = 0;
   let windupEndTime = 0;
   let blockEndTime = 0;
   let pendingCombo = 0;
   let comboDelay = 0;
 
-  // Pattern tracking (player's last punches)
+  // Dodge tracking (replaces setTimeout)
+  let dodgeEndTime = 0;
+
+  // Counter window tracking
+  let lastBlockTime = 0;
+  const COUNTER_WINDOW_MS = 300;
+
   let playerPunchHistory = [];
 
   function init(aiFighter, difficulty) {
@@ -78,6 +85,8 @@ const AIOpponent = (function () {
     state = 'idle';
     nextAttackTime = performance.now() + randomInRange(config.attackInterval);
     playerPunchHistory = [];
+    dodgeEndTime = 0;
+    lastBlockTime = 0;
   }
 
   function randomInRange(range) {
@@ -85,18 +94,13 @@ const AIOpponent = (function () {
   }
 
   function pickPunchType() {
-    // If we have pattern memory, try to exploit player tendencies
     if (config.patternMemory > 0 && playerPunchHistory.length >= 5) {
-      // If player punches a lot, go for counter timing
       const recentPunches = playerPunchHistory.slice(-config.patternMemory);
       const jabCount = recentPunches.filter(p => p === 'jab').length;
-
-      // If player jabs a lot, use hooks to get around guard
       if (jabCount / recentPunches.length > 0.5) {
         if (config.punchTypes.includes('hook')) return 'hook';
       }
     }
-
     return config.punchTypes[Math.floor(Math.random() * config.punchTypes.length)];
   }
 
@@ -109,39 +113,49 @@ const AIOpponent = (function () {
 
   function reactToPlayerPunch(playerFighter) {
     if (state === 'blocking' || state === 'attacking') return;
+    const now = performance.now();
 
     // Decide to block
     if (Math.random() < config.blockChance) {
       fighter.setBlocking(true);
       state = 'blocking';
-      blockEndTime = performance.now() + 400 + Math.random() * 300;
+      blockEndTime = now + 400 + Math.random() * 300;
+      lastBlockTime = now;
 
-      // Counter-attack after block
+      // Counter only within counter window after block
       if (Math.random() < config.counterChance) {
-        blockEndTime = performance.now() + 200;
+        blockEndTime = now + 200;
         pendingCombo = 1;
       }
     }
 
-    // Decide to dodge
+    // Decide to dodge (tracked, not setTimeout)
     if (Math.random() < config.dodgeChance && state !== 'blocking') {
       fighter.dodgeOffset = Math.random() < 0.5 ? -1 : 1;
-      setTimeout(() => { fighter.dodgeOffset = 0; }, 400);
+      dodgeEndTime = now + 350 + Math.random() * 150;
     }
   }
 
   function update(dt, playerFighter) {
     const now = performance.now();
 
+    // Reset dodge when time expires (replaces setTimeout)
+    if (dodgeEndTime > 0 && now > dodgeEndTime) {
+      fighter.dodgeOffset = 0;
+      dodgeEndTime = 0;
+    }
+
     // Handle blocking state
     if (state === 'blocking' && now > blockEndTime) {
       fighter.setBlocking(false);
       state = 'idle';
 
-      // Execute counter if pending
-      if (pendingCombo > 0) {
+      // Execute counter only if within counter window
+      if (pendingCombo > 0 && (now - lastBlockTime) < COUNTER_WINDOW_MS) {
         executeAttack();
         pendingCombo--;
+      } else {
+        pendingCombo = 0;
       }
     }
 
@@ -157,19 +171,16 @@ const AIOpponent = (function () {
 
     // Idle - decide next action
     if (state === 'idle' && fighter.state === 'idle' && now > nextAttackTime) {
-      // Start attack sequence
       if (fighter.stamina > 15) {
         state = 'winding_up';
         windupEndTime = now + config.windupTime;
 
-        // Decide combo length
         if (Math.random() < config.comboChance) {
           pendingCombo = 1 + Math.floor(Math.random() * (config.maxCombo - 1));
         } else {
           pendingCombo = 0;
         }
       }
-
       nextAttackTime = now + randomInRange(config.attackInterval);
     }
 
@@ -184,7 +195,7 @@ const AIOpponent = (function () {
       }
     }
 
-    // Reset state if fighter recovered from stun/knockdown
+    // Reset state if fighter recovered
     if ((fighter.state === 'idle' || fighter.state === 'blocking') &&
         state === 'attacking' && fighter.punchProgress === 0) {
       if (pendingCombo <= 0) {
@@ -208,5 +219,12 @@ const AIOpponent = (function () {
     state = 'attacking';
   }
 
-  return { init, update, reactToPlayerPunch, recordPlayerPunch };
+  // For standing 8-count: AI recovery chance
+  function shouldRecoverFromKnockdown(health) {
+    if (health > 30) return true;
+    if (health > 10) return Math.random() < 0.5;
+    return Math.random() < 0.2;
+  }
+
+  return { init, update, reactToPlayerPunch, recordPlayerPunch, shouldRecoverFromKnockdown };
 })();
